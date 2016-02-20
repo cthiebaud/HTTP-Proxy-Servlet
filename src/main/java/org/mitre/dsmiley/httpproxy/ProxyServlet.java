@@ -1,20 +1,20 @@
-/*
- * Copyright MITRE
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package org.mitre.dsmiley.httpproxy;
+
+import java.io.Closeable;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.CookiePolicy;
+import java.net.HttpCookie;
+import java.net.URI;
+import java.util.BitSet;
+import java.util.Enumeration;
+import java.util.Formatter;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
@@ -24,33 +24,28 @@ import org.apache.http.HttpHost;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
+import org.apache.http.client.RedirectStrategy;
 import org.apache.http.client.config.CookieSpecs;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.AbortableHttpRequest;
+import org.apache.http.client.params.ClientPNames;
 import org.apache.http.client.utils.URIUtils;
 import org.apache.http.config.SocketConfig;
+import org.apache.http.conn.ssl.NoopHostnameVerifier;
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+import org.apache.http.conn.ssl.TrustSelfSignedStrategy;
 import org.apache.http.entity.InputStreamEntity;
 import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.impl.client.LaxRedirectStrategy;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicHttpEntityEnclosingRequest;
 import org.apache.http.message.BasicHttpRequest;
 import org.apache.http.message.HeaderGroup;
+import org.apache.http.params.BasicHttpParams;
+import org.apache.http.params.HttpParams;
+import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.http.util.EntityUtils;
-
-import javax.servlet.ServletException;
-import javax.servlet.http.Cookie;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.io.Closeable;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.net.HttpCookie;
-import java.net.URI;
-import java.util.BitSet;
-import java.util.Enumeration;
-import java.util.Formatter;
 
 /**
  * An HTTP reverse proxy/gateway servlet. It is designed to be extended for customization
@@ -208,8 +203,9 @@ public class ProxyServlet extends HttpServlet {
     }
 
     initTarget();//sets target*
+    
+    proxyClient = createHttpClient();    
 
-    proxyClient = createHttpClient();
   }
 
   /**
@@ -252,21 +248,77 @@ public class ProxyServlet extends HttpServlet {
     targetHost = URIUtils.extractHost(targetUriObj);
   }
 
-  /**
-   * Called from {@link #init(javax.servlet.ServletConfig)}.
-   * HttpClient offers many opportunities for customization.
-   * In any case, it should be thread-safe.
-   */
+  static final RedirectStrategy laxRedirectStrategy = new LaxRedirectStrategy();
+  
+  /** Called from {@link #init(javax.servlet.ServletConfig)}. HttpClient offers many opportunities
+   * for customization. By default,
+   * <a href="http://hc.apache.org/httpcomponents-client-ga/httpclient/apidocs/org/apache/http/impl/client/SystemDefaultHttpClient.html">
+   *   SystemDefaultHttpClient</a> is used if available, otherwise it falls
+   * back to:
+   * <pre>new DefaultHttpClient(new ThreadSafeClientConnManager(),hcParams)</pre>
+   * SystemDefaultHttpClient uses PoolingClientConnectionManager. In any case, it should be thread-safe. */
+  @SuppressWarnings({"unchecked", "deprecation"})
   protected HttpClient createHttpClient() {
-    HttpClientBuilder clientBuilder = HttpClientBuilder.create()
-                                        .setDefaultRequestConfig(buildRequestConfig())
-                                        .setDefaultSocketConfig(buildSocketConfig());
-    
-    clientBuilder.setMaxConnTotal(maxConnections);
-    
-    if (useSystemProperties)
-      clientBuilder = clientBuilder.useSystemProperties();
-    return clientBuilder.build();
+    /*
+    try {
+      //as of HttpComponents v4.2, this class is better since it uses System
+      // Properties:
+      Class clientClazz = Class.forName("org.apache.http.impl.client.SystemDefaultHttpClient");
+      Constructor constructor = clientClazz.getConstructor(HttpParams.class);
+      return (HttpClient) constructor.newInstance(hcParams);
+    } catch (ClassNotFoundException e) {
+      //no problem; use v4.1 below
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+
+    //Fallback on using older client:
+    return new DefaultHttpClient(new ThreadSafeClientConnManager(), hcParams);
+    */
+      try {
+          
+      HttpClientBuilder clientBuilder = HttpClients.custom();
+
+      // THIS IS BAAAAAAAAAAAAAAAAAAAAAAAAAAAD !!!!!!!!!!!!!!!!!!!!!!!
+      // workaround the
+      //     javax.net.ssl.SSLPeerUnverifiedException: Host name 'x.y.z' does not match the certificate subject provided by the peer (CN=...)
+      // exception
+      // cf.
+      // http://stackoverflow.com/questions/2642777/trusting-all-certificates-using-httpclient-over-https
+      // http://www.baeldung.com/httpclient-ssl
+      
+      if (true/*uri.getScheme().equals("https") */) {
+          final SSLContextBuilder builder = new SSLContextBuilder();
+            builder.loadTrustMaterial(null, new TrustSelfSignedStrategy());
+          final SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(builder.build(), new NoopHostnameVerifier());
+          clientBuilder.setSSLSocketFactory(sslsf);
+      } else {
+          // log.info("[shakuntala] dags can only be posted to *.ondemand.com domains");
+          // return;
+      }
+      
+      // THIS WAS BAAAAAAAAAAAAAAAAAAAAAAAAAAAD !!!!!!!!!!!!!!!!!!!!!!!
+      
+      // THIS IS BAAAAAAAAAAAAAD (2) AS WELL !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      // HTTP spec says "POST (...) methods will not be automatically redirected as requiring user confirmation"
+      // cf. http://hc.apache.org/httpcomponents-client-ga/httpclient/apidocs/org/apache/http/impl/client/DefaultRedirectStrategy.html
+      clientBuilder.setRedirectStrategy(laxRedirectStrategy);
+      // THIS WAS BAAAAAAAAAAAAAAAAAAAAAAAAAAAD (2) !!!!!!!!!!!!!!!!!!!!!!!
+      /*
+      better to call clientBuilder.useSystemProperties() (just below)
+      if (proxy != null) {
+          URI proxyURI = URI.create("http://proxy:8080");
+          HttpHost httpHostProxy = new HttpHost(proxyURI.getHost(), proxyURI.getPort());
+          DefaultProxyRoutePlanner routePlanner = new DefaultProxyRoutePlanner(httpHostProxy);
+          clientBuilder.setRoutePlanner(routePlanner);
+      }
+      */
+      
+      clientBuilder.useSystemProperties();
+      return clientBuilder.build();
+      } catch (Exception e) {
+          throw new RuntimeException(e);
+      }
   }
 
   /**
