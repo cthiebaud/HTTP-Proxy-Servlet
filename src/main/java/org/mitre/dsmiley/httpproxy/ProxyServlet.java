@@ -5,13 +5,12 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.HttpCookie;
 import java.net.URI;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
 import java.util.BitSet;
 import java.util.Enumeration;
 import java.util.Formatter;
 import java.util.List;
 
+import javax.net.ssl.SSLContext;
 import javax.servlet.ServletException;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServlet;
@@ -41,8 +40,8 @@ import org.apache.http.HttpHeaders;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
+import org.apache.http.client.CredentialsProvider;
 import org.apache.http.client.HttpClient;
-import org.apache.http.client.RedirectStrategy;
 import org.apache.http.client.methods.AbortableHttpRequest;
 import org.apache.http.client.params.ClientPNames;
 import org.apache.http.client.params.CookiePolicy;
@@ -53,8 +52,6 @@ import org.apache.http.conn.ssl.TrustSelfSignedStrategy;
 import org.apache.http.entity.InputStreamEntity;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.client.HttpClients;
-import org.apache.http.impl.client.LaxRedirectStrategy;
-import org.apache.http.impl.conn.DefaultProxyRoutePlanner;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicHttpEntityEnclosingRequest;
 import org.apache.http.message.BasicHttpRequest;
@@ -79,8 +76,8 @@ import org.apache.http.util.EntityUtils;
  *
  * @author David Smiley dsmiley@mitre.org
  */
-public class ProxyServlet extends HttpServlet {
-
+public abstract class ProxyServlet extends HttpServlet {
+    
   /* INIT PARAMETER NAME CONSTANTS */
 
   /** A boolean parameter name to enable logging of input and target URLs to the servlet log. */
@@ -168,8 +165,6 @@ public class ProxyServlet extends HttpServlet {
     targetHost = URIUtils.extractHost(targetUriObj);
   }
 
-  static final RedirectStrategy laxRedirectStrategy = new LaxRedirectStrategy();
-  
   /** Called from {@link #init(javax.servlet.ServletConfig)}. HttpClient offers many opportunities
    * for customization. By default,
    * <a href="http://hc.apache.org/httpcomponents-client-ga/httpclient/apidocs/org/apache/http/impl/client/SystemDefaultHttpClient.html">
@@ -177,7 +172,10 @@ public class ProxyServlet extends HttpServlet {
    * back to:
    * <pre>new DefaultHttpClient(new ThreadSafeClientConnManager(),hcParams)</pre>
    * SystemDefaultHttpClient uses PoolingClientConnectionManager. In any case, it should be thread-safe. */
-  @SuppressWarnings({"unchecked", "deprecation"})
+  
+  abstract protected SSLContext          getSSLContext()          throws Exception;
+  abstract protected CredentialsProvider getCredentialsProvider() throws Exception;
+
   protected HttpClient createHttpClient(HttpParams hcParams) {
     /*
     try {
@@ -198,50 +196,51 @@ public class ProxyServlet extends HttpServlet {
       try {
           
       HttpClientBuilder clientBuilder = HttpClients.custom();
-
-      // THIS IS BAAAAAAAAAAAAAAAAAAAAAAAAAAAD !!!!!!!!!!!!!!!!!!!!!!!
-      // workaround the
-      //     javax.net.ssl.SSLPeerUnverifiedException: Host name 'x.y.z' does not match the certificate subject provided by the peer (CN=...)
-      // exception
-      // cf.
-      // http://stackoverflow.com/questions/2642777/trusting-all-certificates-using-httpclient-over-https
-      // http://www.baeldung.com/httpclient-ssl
       
-      if (true/*uri.getScheme().equals("https") */) {
-          final SSLContextBuilder builder = new SSLContextBuilder();
-            builder.loadTrustMaterial(null, new TrustSelfSignedStrategy());
-          final SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(builder.build(), new NoopHostnameVerifier());
-          clientBuilder.setSSLSocketFactory(sslsf);
-      } else {
-          // log.info("[shakuntala] dags can only be posted to *.ondemand.com domains");
-          // return;
+      // trust server
+      {
+          SSLContext sslcontext = getSSLContext();
+          if (sslcontext != null) {
+              // Allow TLSv1 protocol only
+              SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(
+                      sslcontext,
+                      new String[] { "TLSv1" },
+                      null,
+                      SSLConnectionSocketFactory.getDefaultHostnameVerifier());
+              clientBuilder.setSSLSocketFactory(sslsf);
+          } else {
+              // Trust own CA and all self-signed certs
+              final SSLContextBuilder builder = new SSLContextBuilder();
+              builder.loadTrustMaterial(null, new TrustSelfSignedStrategy());
+              final SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(
+                      builder.build(), 
+                      new NoopHostnameVerifier());
+              clientBuilder.setSSLSocketFactory(sslsf);          
+          }
       }
-      
-      // THIS WAS BAAAAAAAAAAAAAAAAAAAAAAAAAAAD !!!!!!!!!!!!!!!!!!!!!!!
-      
-      // THIS IS BAAAAAAAAAAAAAD (2) AS WELL !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      // HTTP spec says "POST (...) methods will not be automatically redirected as requiring user confirmation"
-      // cf. http://hc.apache.org/httpcomponents-client-ga/httpclient/apidocs/org/apache/http/impl/client/DefaultRedirectStrategy.html
-      clientBuilder.setRedirectStrategy(laxRedirectStrategy);
-      // THIS WAS BAAAAAAAAAAAAAAAAAAAAAAAAAAAD (2) !!!!!!!!!!!!!!!!!!!!!!!
-      /*
-      better to call clientBuilder.useSystemProperties() (just below)
-      if (proxy != null) {
-          URI proxyURI = URI.create("http://proxy:8080");
-          HttpHost httpHostProxy = new HttpHost(proxyURI.getHost(), proxyURI.getPort());
-          DefaultProxyRoutePlanner routePlanner = new DefaultProxyRoutePlanner(httpHostProxy);
-          clientBuilder.setRoutePlanner(routePlanner);
+      // identify me to server
+      {
+          CredentialsProvider credsProvider = getCredentialsProvider();  
+          if (credsProvider != null) {
+              clientBuilder.setDefaultCredentialsProvider(credsProvider);
+          }
       }
-      */
-      
-      clientBuilder.useSystemProperties();
+      // allow redirects (not sure if strictly needed; does no harm.
+      {
+          // clientBuilder.setRedirectStrategy(new LaxRedirectStrategy());
+      }
+      // proxy hell
+      {
+          clientBuilder.useSystemProperties();
+      }
       return clientBuilder.build();
       } catch (Exception e) {
           throw new RuntimeException(e);
       }
   }
 
-  /** The http client used.
+
+/** The http client used.
    * @see #createHttpClient(HttpParams) */
   protected HttpClient getProxyClient() {
     return proxyClient;

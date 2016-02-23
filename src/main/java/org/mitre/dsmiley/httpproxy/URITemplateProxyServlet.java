@@ -1,9 +1,11 @@
 package org.mitre.dsmiley.httpproxy;
 
 import org.apache.http.NameValuePair;
+import org.apache.http.client.CredentialsProvider;
 import org.apache.http.client.utils.URIUtils;
 import org.apache.http.client.utils.URLEncodedUtils;
 
+import javax.net.ssl.SSLContext;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -122,4 +124,14 @@ public class URITemplateProxyServlet extends ProxyServlet {
   protected String rewriteQueryStringFromRequest(HttpServletRequest servletRequest, String queryString) {
     return (String) servletRequest.getAttribute(ATTR_QUERY_STRING);
   }
+
+@Override
+protected SSLContext getSSLContext() throws Exception {
+    return null;
+}
+
+@Override
+protected CredentialsProvider getCredentialsProvider() throws Exception {
+    return null;
+}
 }
