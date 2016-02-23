@@ -22,9 +22,11 @@ import org.apache.http.Header;
 import org.apache.http.HttpException;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
+import org.apache.http.client.CredentialsProvider;
 import org.apache.http.protocol.HttpContext;
 import org.junit.Test;
 
+import javax.net.ssl.SSLContext;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -96,6 +98,16 @@ public class ModifyHeadersProxyServletTest extends ProxyServletTest {
       } else {
         super.copyResponseHeader(servletRequest, servletResponse, header);
       }
+    }
+
+    @Override
+    protected SSLContext getSSLContext() throws Exception {
+        return null;
+    }
+
+    @Override
+    protected CredentialsProvider getCredentialsProvider() throws Exception {
+        return null;
     }
 
   }
