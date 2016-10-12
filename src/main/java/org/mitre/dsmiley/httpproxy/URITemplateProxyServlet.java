@@ -1,3 +1,19 @@
+/*
+ * Copyright MITRE
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.mitre.dsmiley.httpproxy;
 
 import org.apache.http.NameValuePair;
@@ -28,17 +44,19 @@ import java.util.regex.Pattern;
  * --which has the template variables.  The incoming request must contain query args of these
  * names.  They are removed when the request is sent to the target.
  */
+@SuppressWarnings({"serial"})
 public class URITemplateProxyServlet extends ProxyServlet {
-/* Rich:
- * It might be a nice addition to have some syntax that allowed a proxy arg to be "optional", that is,
- * don't fail if not present, just return the empty string or a given default. But I don't see
- * anything in the spec that supports this kind of construct.
- * Notionally, it might look like {?host:google.com} would return the value of
- * the URL parameter "?hostProxyArg=somehost.com" if defined, but if not defined, return "google.com".
- * Similarly, {?host} could return the value of hostProxyArg or empty string if not present.
- * But that's not how the spec works. So for now we will require a proxy arg to be present
- * if defined for this proxy URL.
- */
+
+  /* Rich:
+  * It might be a nice addition to have some syntax that allowed a proxy arg to be "optional", that is,
+  * don't fail if not present, just return the empty string or a given default. But I don't see
+  * anything in the spec that supports this kind of construct.
+  * Notionally, it might look like {?host:google.com} would return the value of
+  * the URL parameter "?hostProxyArg=somehost.com" if defined, but if not defined, return "google.com".
+  * Similarly, {?host} could return the value of hostProxyArg or empty string if not present.
+  * But that's not how the spec works. So for now we will require a proxy arg to be present
+  * if defined for this proxy URL.
+  */
   protected static final Pattern TEMPLATE_PATTERN = Pattern.compile("\\{([a-zA-Z0-9_%.]+)\\}");
   private static final String ATTR_QUERY_STRING =
           URITemplateProxyServlet.class.getSimpleName() + ".queryString";

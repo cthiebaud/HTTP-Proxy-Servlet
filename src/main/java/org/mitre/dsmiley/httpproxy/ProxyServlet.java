@@ -1,3 +1,19 @@
+/*
+ * Copyright MITRE
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.mitre.dsmiley.httpproxy;
 
 import java.io.Closeable;
@@ -16,23 +32,6 @@ import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
-/**
- * Copyright MITRE
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpEntityEnclosingRequest;
@@ -76,8 +75,9 @@ import org.apache.http.util.EntityUtils;
  *
  * @author David Smiley dsmiley@mitre.org
  */
+@SuppressWarnings({ "deprecation", "serial" })
 public abstract class ProxyServlet extends HttpServlet {
-    
+
   /* INIT PARAMETER NAME CONSTANTS */
 
   /** A boolean parameter name to enable logging of input and target URLs to the servlet log. */
@@ -181,8 +181,8 @@ public abstract class ProxyServlet extends HttpServlet {
     try {
       //as of HttpComponents v4.2, this class is better since it uses System
       // Properties:
-      Class clientClazz = Class.forName("org.apache.http.impl.client.SystemDefaultHttpClient");
-      Constructor constructor = clientClazz.getConstructor(HttpParams.class);
+      Class<?> clientClazz = Class.forName("org.apache.http.impl.client.SystemDefaultHttpClient");
+      Constructor<?> constructor = clientClazz.getConstructor(HttpParams.class);
       return (HttpClient) constructor.newInstance(hcParams);
     } catch (ClassNotFoundException e) {
       //no problem; use v4.1 below
@@ -249,7 +249,7 @@ public abstract class ProxyServlet extends HttpServlet {
   /** Reads a servlet config parameter by the name {@code hcParamName} of type {@code type}, and
    * set it in {@code hcParams}.
    */
-  protected void readConfigParam(HttpParams hcParams, String hcParamName, Class type) {
+  protected void readConfigParam(HttpParams hcParams, String hcParamName, Class<?> type) {
     String val_str = getConfigParam(hcParamName);
     if (val_str == null)
       return;
@@ -367,7 +367,7 @@ public abstract class ProxyServlet extends HttpServlet {
     }
   }
 
-  private HttpRequest newProxyRequestWithEntity(String method, String proxyRequestUri,
+  protected HttpRequest newProxyRequestWithEntity(String method, String proxyRequestUri,
                                                 HttpServletRequest servletRequest)
           throws IOException {
     HttpEntityEnclosingRequest eProxyRequest =
@@ -375,8 +375,17 @@ public abstract class ProxyServlet extends HttpServlet {
     // Add the input entity (streamed)
     //  note: we don't bother ensuring we close the servletInputStream since the container handles it
     eProxyRequest.setEntity(
-            new InputStreamEntity(servletRequest.getInputStream(), servletRequest.getContentLength()));
+            new InputStreamEntity(servletRequest.getInputStream(), getContentLength(servletRequest)));
     return eProxyRequest;
+  }
+
+  // Get the header value as a long in order to more correctly proxy very large requests
+  private long getContentLength(HttpServletRequest request) {
+    String contentLengthHeader = request.getHeader("Content-Length");
+    if (contentLengthHeader != null) {
+      return Long.parseLong(contentLengthHeader);
+    }
+    return -1L;
   }
 
   protected void closeQuietly(Closeable closeable) {
@@ -399,7 +408,7 @@ public abstract class ProxyServlet extends HttpServlet {
 
   /** These are the "hop-by-hop" headers that should not be copied.
    * http://www.w3.org/Protocols/rfc2616/rfc2616-sec13.html
-   * I use an HttpClient HeaderGroup class instead of Set<String> because this
+   * I use an HttpClient HeaderGroup class instead of Set&lt;String&gt; because this
    * approach does case insensitive lookup faster.
    */
   protected static final HeaderGroup hopByHopHeaders;
@@ -416,9 +425,10 @@ public abstract class ProxyServlet extends HttpServlet {
   /** Copy request headers from the servlet client to the proxy request. */
   protected void copyRequestHeaders(HttpServletRequest servletRequest, HttpRequest proxyRequest) {
     // Get an Enumeration of all of the header names sent by the client
-    Enumeration enumerationOfHeaderNames = servletRequest.getHeaderNames();
+    @SuppressWarnings("unchecked")
+    Enumeration<String> enumerationOfHeaderNames = servletRequest.getHeaderNames();
     while (enumerationOfHeaderNames.hasMoreElements()) {
-      String headerName = (String) enumerationOfHeaderNames.nextElement();
+      String headerName = enumerationOfHeaderNames.nextElement();
       copyRequestHeader(servletRequest, proxyRequest, headerName);
     }
   }
@@ -435,9 +445,10 @@ public abstract class ProxyServlet extends HttpServlet {
     if (hopByHopHeaders.containsHeader(headerName))
       return;
 
-    Enumeration headers = servletRequest.getHeaders(headerName);
+    @SuppressWarnings("unchecked")
+    Enumeration<String> headers = servletRequest.getHeaders(headerName);
     while (headers.hasMoreElements()) {//sometimes more than one value
-      String headerValue = (String) headers.nextElement();
+      String headerValue = headers.nextElement();
       // In case the proxy host is running multiple virtual servers,
       // rewrite the Host header to ensure that we get content from
       // the correct virtual server
@@ -505,7 +516,7 @@ public abstract class ProxyServlet extends HttpServlet {
 
     for (HttpCookie cookie : cookies) {
       //set cookie name prefixed w/ a proxy value so it won't collide w/ other cookies
-      String proxyCookieName = getCookieNamePrefix() + cookie.getName();
+      String proxyCookieName = getCookieNamePrefix(cookie.getName()) + cookie.getName();
       Cookie servletCookie = new Cookie(proxyCookieName, cookie.getValue());
       servletCookie.setComment(cookie.getComment());
       servletCookie.setMaxAge((int) cookie.getMaxAge());
@@ -528,8 +539,8 @@ public abstract class ProxyServlet extends HttpServlet {
       String cookieSplit[] = cookie.split("=");
       if (cookieSplit.length == 2) {
         String cookieName = cookieSplit[0];
-        if (cookieName.startsWith(getCookieNamePrefix())) {
-          cookieName = cookieName.substring(getCookieNamePrefix().length());
+        if (cookieName.startsWith(getCookieNamePrefix(cookieName))) {
+          cookieName = cookieName.substring(getCookieNamePrefix(cookieName).length());
           if (escapedCookie.length() > 0) {
             escapedCookie.append("; ");
           }
@@ -543,7 +554,7 @@ public abstract class ProxyServlet extends HttpServlet {
   }
 
   /** The string prefixing rewritten cookies. */
-  protected String getCookieNamePrefix() {
+  protected String getCookieNamePrefix(String name) {
     return "!Proxy!" + getServletConfig().getServletName();
   }
 
@@ -644,7 +655,7 @@ public abstract class ProxyServlet extends HttpServlet {
    * To be more forgiving, we must escape the problematic characters.  See the URI class for the
    * spec.
    *
-   * @param in example: name=value&foo=bar#fragment
+   * @param in example: name=value&amp;foo=bar#fragment
    */
   protected static CharSequence encodeUriQuery(CharSequence in) {
     //Note that I can't simply use URI.java to encode because it will escape pre-existing escaped things.
