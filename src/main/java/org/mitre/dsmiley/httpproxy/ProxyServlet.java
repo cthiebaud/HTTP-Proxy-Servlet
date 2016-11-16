@@ -86,6 +86,12 @@ public abstract class ProxyServlet extends HttpServlet {
   /** A boolean parameter name to enable forwarding of the client IP  */
   public static final String P_FORWARDEDFOR = "forwardip";
 
+  /** A boolean parameter name to keep HOST parameter as-is  */
+  public static final String P_PRESERVEHOST = "preserveHost";
+
+  /** A boolean parameter name to keep COOKIES as-is  */
+  public static final String P_PRESERVECOOKIES = "preserveCookies";
+
   /** The parameter name for the target (destination) URI to proxy to. */
   protected static final String P_TARGET_URI = "targetUri";
   protected static final String ATTR_TARGET_URI =
@@ -99,7 +105,9 @@ public abstract class ProxyServlet extends HttpServlet {
   protected boolean doForwardIP = true;
   /** User agents shouldn't send the url fragment but what if it does? */
   protected boolean doSendUrlFragment = true;
-
+  protected boolean doPreserveHost = false;
+  protected boolean doPreserveCookies = false;
+  
   //These next 3 are cached here, and should only be referred to in initialization logic. See the
   // ATTR_* parameters.
   /** From the configured parameter "targetUri". */
@@ -143,6 +151,15 @@ public abstract class ProxyServlet extends HttpServlet {
         this.doForwardIP = Boolean.parseBoolean(doForwardIPString);
     }
 
+    String preserveHostString = getConfigParam(P_PRESERVEHOST);
+    if (preserveHostString != null) {
+        this.doPreserveHost = Boolean.parseBoolean(preserveHostString);
+    }
+
+    String preserveCookiesString = getConfigParam(P_PRESERVECOOKIES);
+    if (preserveCookiesString != null) {
+        this.doPreserveCookies = Boolean.parseBoolean(preserveCookiesString);
+    }
     initTarget();//sets target*
 
     HttpParams hcParams = new BasicHttpParams();
@@ -452,12 +469,12 @@ public abstract class ProxyServlet extends HttpServlet {
       // In case the proxy host is running multiple virtual servers,
       // rewrite the Host header to ensure that we get content from
       // the correct virtual server
-      if (headerName.equalsIgnoreCase(HttpHeaders.HOST)) {
+      if (!doPreserveHost && headerName.equalsIgnoreCase(HttpHeaders.HOST)) {
         HttpHost host = getTargetHost(servletRequest);
         headerValue = host.getHostName();
         if (host.getPort() != -1)
           headerValue += ":"+host.getPort();
-      } else if (headerName.equalsIgnoreCase(org.apache.http.cookie.SM.COOKIE)) {
+      } else if (!doPreserveCookies && headerName.equalsIgnoreCase(org.apache.http.cookie.SM.COOKIE)) {
         headerValue = getRealCookie(headerValue);
       }
       proxyRequest.addHeader(headerName, headerValue);
@@ -467,13 +484,17 @@ public abstract class ProxyServlet extends HttpServlet {
   private void setXForwardedForHeader(HttpServletRequest servletRequest,
                                       HttpRequest proxyRequest) {
     if (doForwardIP) {
-      String headerName = "X-Forwarded-For";
-      String newHeader = servletRequest.getRemoteAddr();
-      String existingHeader = servletRequest.getHeader(headerName);
-      if (existingHeader != null) {
-        newHeader = existingHeader + ", " + newHeader;
+      String forHeaderName = "X-Forwarded-For";
+      String forHeader = servletRequest.getRemoteAddr();
+      String existingForHeader = servletRequest.getHeader(forHeaderName);
+      if (existingForHeader != null) {
+        forHeader = existingForHeader + ", " + forHeader;
       }
-      proxyRequest.setHeader(headerName, newHeader);
+      proxyRequest.setHeader(forHeaderName, forHeader);
+
+      String protoHeaderName = "X-Forwarded-Proto";
+      String protoHeader = servletRequest.getScheme();
+      proxyRequest.setHeader(protoHeaderName, protoHeader);
     }
   }
 
@@ -516,7 +537,7 @@ public abstract class ProxyServlet extends HttpServlet {
 
     for (HttpCookie cookie : cookies) {
       //set cookie name prefixed w/ a proxy value so it won't collide w/ other cookies
-      String proxyCookieName = getCookieNamePrefix(cookie.getName()) + cookie.getName();
+      String proxyCookieName = doPreserveCookies ? cookie.getName() : getCookieNamePrefix(cookie.getName()) + cookie.getName();
       Cookie servletCookie = new Cookie(proxyCookieName, cookie.getValue());
       servletCookie.setComment(cookie.getComment());
       servletCookie.setMaxAge((int) cookie.getMaxAge());
