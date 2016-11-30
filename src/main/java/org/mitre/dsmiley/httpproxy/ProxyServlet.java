@@ -5,9 +5,11 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.HttpCookie;
 import java.net.URI;
+import java.util.AbstractMap;
 import java.util.BitSet;
 import java.util.Enumeration;
 import java.util.Formatter;
+import java.util.Map;
 
 import javax.net.ssl.SSLContext;
 import javax.servlet.ServletException;
@@ -30,6 +32,7 @@ import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.AbortableHttpRequest;
 import org.apache.http.client.utils.URIUtils;
 import org.apache.http.config.SocketConfig;
+import org.apache.http.conn.params.ConnRoutePNames;
 import org.apache.http.conn.ssl.NoopHostnameVerifier;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.conn.ssl.TrustSelfSignedStrategy;
@@ -40,7 +43,6 @@ import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicHttpEntityEnclosingRequest;
 import org.apache.http.message.BasicHttpRequest;
 import org.apache.http.message.HeaderGroup;
-import org.apache.http.params.HttpParams;
 import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.http.util.EntityUtils;
 
@@ -147,8 +149,28 @@ public abstract class ProxyServlet extends HttpServlet {
     return getServletConfig().getInitParameter(key);
   }
 
+  private Map.Entry<String, Integer>    onPremiseProxy  = null;
+  private String                        consumerAccount = null;
+  
   @Override
   public void init() throws ServletException {
+      
+    //////////////////canary
+    String proxyHost = System.getenv("HC_OP_HTTP_PROXY_HOST");
+    String proxyPortAsAString = System.getenv("HC_OP_HTTP_PROXY_PORT");
+    String globalhost = System.getenv("HC_GLOBAL_HOST");
+    if (proxyHost != null && proxyPortAsAString != null && globalhost != null && globalhost.equals("int.sap.hana.ondemand.com")) {
+       int proxyPort;
+       try {
+           proxyPort = Integer.parseInt(proxyPortAsAString);
+           onPremiseProxy = new AbstractMap.SimpleEntry<>(proxyHost, proxyPort);
+       } catch (NumberFormatException e) {
+           onPremiseProxy = null;
+       }
+    }
+    this.consumerAccount = System.getenv("HC_ACCOUNT");
+    ////////////////// canary
+      
     String doLogStr = getConfigParam(P_LOG);
     if (doLogStr != null) {
       this.doLog = Boolean.parseBoolean(doLogStr);
@@ -370,6 +392,16 @@ public abstract class ProxyServlet extends HttpServlet {
     }
 
     copyRequestHeaders(servletRequest, proxyRequest);
+    
+    //////////////////canary
+    if (onPremiseProxy != null) {
+        proxyRequest.getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY, new HttpHost(onPremiseProxy.getKey(), onPremiseProxy.getValue()));
+    }
+    
+    if (consumerAccount != null && !consumerAccount.trim().isEmpty()) {
+        proxyRequest.setHeader( "SAP-Connectivity-ConsumerAccount", consumerAccount);
+    }
+    //////////////////canary
 
     setXForwardedForHeader(servletRequest, proxyRequest);
 
