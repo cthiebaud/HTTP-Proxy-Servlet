@@ -301,26 +301,30 @@ public abstract class ProxyServlet extends HttpServlet {
       HttpClientBuilder clientBuilder = HttpClients.custom();
       
       // trust server
-      {
-          SSLContext sslcontext = getSSLContext();
-          if (sslcontext != null) {
-              // Allow TLSv1 protocol only
-              SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(
-                      sslcontext,
-                      new String[] { "TLSv1" },
-                      null,
-                      SSLConnectionSocketFactory.getDefaultHostnameVerifier());
-              clientBuilder.setSSLSocketFactory(sslsf);
-          } else {
-              // Trust own CA and all self-signed certs
-              final SSLContextBuilder builder = new SSLContextBuilder();
-              builder.loadTrustMaterial(null, new TrustSelfSignedStrategy());
-              final SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(
-                      builder.build(), 
-                      new NoopHostnameVerifier());
-              clientBuilder.setSSLSocketFactory(sslsf);          
-          }
-      }
+      final SSLContextBuilder builder = new SSLContextBuilder();
+      builder.loadTrustMaterial(null, new TrustSelfSignedStrategy());
+      final SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(builder.build(), new NoopHostnameVerifier());
+      clientBuilder.setSSLSocketFactory(sslsf);
+//      {
+//          SSLContext sslcontext = getSSLContext();
+//          if (sslcontext != null) {
+//              // Allow TLSv1 protocol only
+//              SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(
+//                      sslcontext,
+//                      new String[] { "TLSv1" },
+//                      null,
+//                      SSLConnectionSocketFactory.getDefaultHostnameVerifier());
+//              clientBuilder.setSSLSocketFactory(sslsf);
+//          } else {
+//              // Trust own CA and all self-signed certs
+//              final SSLContextBuilder builder = new SSLContextBuilder();
+//              builder.loadTrustMaterial(null, new TrustSelfSignedStrategy());
+//              final SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(
+//                      builder.build(), 
+//                      new NoopHostnameVerifier());
+//              clientBuilder.setSSLSocketFactory(sslsf);          
+//          }
+//      }
       // identify me to server
       {
           CredentialsProvider credsProvider = getCredentialsProvider();  
