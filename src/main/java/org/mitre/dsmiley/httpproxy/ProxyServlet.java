@@ -11,6 +11,9 @@ import java.util.Enumeration;
 import java.util.Formatter;
 import java.util.Map;
 
+import javax.naming.Context;
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
 import javax.net.ssl.SSLContext;
 import javax.servlet.ServletException;
 import javax.servlet.http.Cookie;
@@ -45,6 +48,9 @@ import org.apache.http.message.BasicHttpRequest;
 import org.apache.http.message.HeaderGroup;
 import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.http.util.EntityUtils;
+
+import com.sap.core.connectivity.api.authentication.AuthenticationHeader;
+import com.sap.core.connectivity.api.authentication.AuthenticationHeaderProvider;
 
 /**
  * An HTTP reverse proxy/gateway servlet. It is designed to be extended for customization
@@ -124,6 +130,7 @@ public abstract class ProxyServlet extends HttpServlet {
   protected String targetUri;
   protected URI targetUriObj;//new URI(targetUri)
   protected HttpHost targetHost;//URIUtils.extractHost(targetUriObj);
+  protected String proxyType; // "internet" or "onpremise"
 
   private HttpClient proxyClient;
 
@@ -398,16 +405,31 @@ public abstract class ProxyServlet extends HttpServlet {
     copyRequestHeaders(servletRequest, proxyRequest);
     
     //////////////////canary
-    if (proxyRequestUri.contains("sap.corp")){
-        if (onPremiseProxy != null) {
-            proxyRequest.getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY, new HttpHost(onPremiseProxy.getKey(), onPremiseProxy.getValue()));
-        } else {
-            proxyRequest.getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY, new HttpHost(System.getProperty("http.proxyHost"), Integer.valueOf(System.getProperty("http.proxyPort"))));
-        }
+    if (proxyType.equals("internet")){
+        proxyRequest.getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY, new HttpHost(System.getProperty("http.proxyHost"), Integer.valueOf(System.getProperty("http.proxyPort"))));
+    } else if (onPremiseProxy != null) {
+        proxyRequest.getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY, new HttpHost(onPremiseProxy.getKey(), onPremiseProxy.getValue()));
     }
     
     if (consumerAccount != null && !consumerAccount.trim().isEmpty()) {
         proxyRequest.setHeader( "SAP-Connectivity-ConsumerAccount", consumerAccount);
+
+        // look up the connectivity authentication header provider resource called "authHeaderProvider" (must be defined in web.xml)
+        Context ctx;
+        try {
+            ctx = new InitialContext();
+            AuthenticationHeaderProvider authHeaderProvider = (AuthenticationHeaderProvider) ctx.lookup("java:comp/env/authenticationHeaderProvider");
+            // get header for principal propagation
+            AuthenticationHeader principalPropagationHeader = authHeaderProvider.getPrincipalPropagationHeader();
+            //insert the necessary headers in the request
+            System.out.println("principalPropagationHeader.getName() = "+principalPropagationHeader.getName());
+            System.out.println("principalPropagationHeader.getValue() = "+principalPropagationHeader.getValue());
+            proxyRequest.addHeader(principalPropagationHeader.getName(), principalPropagationHeader.getValue());
+        } catch (NamingException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+
     }
     //////////////////canary
 

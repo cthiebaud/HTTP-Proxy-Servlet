@@ -16,15 +16,6 @@
 
 package org.mitre.dsmiley.httpproxy;
 
-import org.apache.http.NameValuePair;
-import org.apache.http.client.CredentialsProvider;
-import org.apache.http.client.utils.URIUtils;
-import org.apache.http.client.utils.URLEncodedUtils;
-
-import javax.net.ssl.SSLContext;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -34,12 +25,22 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.net.ssl.SSLContext;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.apache.http.NameValuePair;
+import org.apache.http.client.CredentialsProvider;
+import org.apache.http.client.utils.URIUtils;
+import org.apache.http.client.utils.URLEncodedUtils;
+
 /**
  * A proxy servlet in which the target URI is templated from incoming request parameters. The
  * format adheres to the <a href="http://tools.ietf.org/html/rfc6570">URI Template RFC</a>, "Level
  * 1". Example:
  * <pre>
- *   targetUri = http://{host}:{port}/{path}
+ *   targetUri = {scheme}://{host}:{port}/{path}
  * </pre>
  * --which has the template variables.  The incoming request must contain query args of these
  * names.  They are removed when the request is sent to the target.
@@ -114,11 +115,26 @@ public class URITemplateProxyServlet extends ProxyServlet {
       String replacement = params.remove(arg);//note we remove
       if (replacement == null) {
         throw new ServletException("Missing HTTP parameter "+arg+" to fill the template");
+      } else if (arg.equals("proxyType")) {
+          this.proxyType = replacement;
+          matcher.appendReplacement(urlBuf, "");
+      } else {
+          matcher.appendReplacement(urlBuf, replacement);
       }
-      matcher.appendReplacement(urlBuf, replacement);
+    }
+    if (this.proxyType == null) {
+        throw new ServletException("Missing HTTP parameter proxyType");
     }
     matcher.appendTail(urlBuf);
     String newTargetUri = urlBuf.toString();
+    int iPort = newTargetUri.indexOf(":-1");
+    if (iPort > 0) {
+        if (newTargetUri.startsWith("https")) {
+            newTargetUri = newTargetUri.substring(0, iPort) + ":443" + newTargetUri.substring(iPort+3);  
+        } else {
+            newTargetUri = newTargetUri.substring(0, iPort) + ":80" + newTargetUri.substring(iPort+3);  
+        }
+    }
     servletRequest.setAttribute(ATTR_TARGET_URI, newTargetUri);
     URI targetUriObj;
     try {
