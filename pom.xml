@@ -58,6 +58,20 @@
 
   <dependencies>
 
+    <!-- get neo -->
+    <dependency>
+        <groupId>com.sap.cloud</groupId>
+        <artifactId>neo-java-web-api</artifactId>
+        <version>3.17.4</version>
+        <scope>provided</scope>
+        <!-- exclusions>
+            <exclusion>
+                <groupId>*</groupId>
+                <artifactId>*</artifactId>
+            </exclusion>
+        </exclusions -->
+    </dependency>
+
     <!-- FYI tomcat 5.5 & beyond -->
     <dependency>
       <groupId>javax.servlet</groupId>
