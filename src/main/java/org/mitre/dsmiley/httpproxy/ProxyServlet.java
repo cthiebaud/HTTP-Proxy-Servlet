@@ -398,10 +398,12 @@ public abstract class ProxyServlet extends HttpServlet {
     copyRequestHeaders(servletRequest, proxyRequest);
     
     //////////////////canary
-    if (onPremiseProxy != null) {
-        proxyRequest.getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY, new HttpHost(onPremiseProxy.getKey(), onPremiseProxy.getValue()));
-    } else if (!proxyRequestUri.contains("sap.corp")){
-        proxyRequest.getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY, new HttpHost("proxy.wdf.sap.corp", 8080));
+    if (proxyRequestUri.contains("sap.corp")){
+        if (onPremiseProxy != null) {
+            proxyRequest.getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY, new HttpHost(onPremiseProxy.getKey(), onPremiseProxy.getValue()));
+        } else {
+            proxyRequest.getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY, new HttpHost(System.getProperty("http.proxyHost"), Integer.valueOf(System.getProperty("http.proxyPort"))));
+        }
     }
     
     if (consumerAccount != null && !consumerAccount.trim().isEmpty()) {
