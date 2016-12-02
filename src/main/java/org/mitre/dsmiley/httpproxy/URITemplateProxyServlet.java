@@ -131,8 +131,10 @@ public class URITemplateProxyServlet extends ProxyServlet {
     if (iPort > 0) {
         if (newTargetUri.startsWith("https")) {
             newTargetUri = newTargetUri.substring(0, iPort) + ":443" + newTargetUri.substring(iPort+3);  
+        } else if (newTargetUri.startsWith("https")){
+            newTargetUri = newTargetUri.substring(0, iPort) + ":80" + newTargetUri.substring(iPort+3);
         } else {
-            newTargetUri = newTargetUri.substring(0, iPort) + ":80" + newTargetUri.substring(iPort+3);  
+            newTargetUri = newTargetUri.substring(0, iPort) + newTargetUri.substring(iPort+3);
         }
     }
     servletRequest.setAttribute(ATTR_TARGET_URI, newTargetUri);
