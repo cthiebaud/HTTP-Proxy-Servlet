@@ -51,6 +51,7 @@ import org.apache.http.client.utils.URIUtils;
 import org.apache.http.conn.params.ConnRoutePNames;
 import org.apache.http.conn.ssl.NoopHostnameVerifier;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+import org.apache.http.conn.ssl.SSLContextBuilder;
 import org.apache.http.conn.ssl.TrustSelfSignedStrategy;
 import org.apache.http.entity.InputStreamEntity;
 import org.apache.http.impl.client.HttpClientBuilder;
@@ -61,7 +62,6 @@ import org.apache.http.message.BasicHttpRequest;
 import org.apache.http.message.HeaderGroup;
 import org.apache.http.params.BasicHttpParams;
 import org.apache.http.params.HttpParams;
-import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.http.util.EntityUtils;
 
 /**
@@ -366,10 +366,7 @@ public abstract class ProxyServlet extends HttpServlet {
     HttpResponse proxyResponse = null;
     try {
       // Execute the request
-      if (doLog) {
-        log("proxy " + method + " uri: " + servletRequest.getRequestURI() + " -- " + proxyRequest.getRequestLine().getUri());
-      }
-      proxyResponse = proxyClient.execute(getTargetHost(servletRequest), proxyRequest);
+        proxyResponse = doExecute(servletRequest, servletResponse, proxyRequest);
 
       // Process the response:
 
@@ -417,6 +414,15 @@ public abstract class ProxyServlet extends HttpServlet {
       // http://stackoverflow.com/questions/1159168/should-one-call-close-on-httpservletresponse-getoutputstream-getwriter
     }
   }
+
+    protected HttpResponse doExecute(HttpServletRequest servletRequest, HttpServletResponse servletResponse,
+                                     HttpRequest proxyRequest) throws IOException {
+        if (doLog) {
+            log("proxy " + servletRequest.getMethod() + " uri: " + servletRequest.getRequestURI() + " -- " +
+                    proxyRequest.getRequestLine().getUri());
+        }
+        return proxyClient.execute(getTargetHost(servletRequest), proxyRequest);
+    }
 
   protected HttpRequest newProxyRequestWithEntity(String method, String proxyRequestUri,
                                                 HttpServletRequest servletRequest)
