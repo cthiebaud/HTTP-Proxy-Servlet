@@ -16,16 +16,6 @@
 
 package org.mitre.dsmiley.httpproxy;
 
-import org.apache.http.NameValuePair;
-import org.apache.http.client.CredentialsProvider;
-import org.apache.http.client.utils.URIUtils;
-import org.apache.http.client.utils.URLEncodedUtils;
-import org.hamcrest.core.StringStartsWith;
-
-import javax.net.ssl.SSLContext;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -34,6 +24,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import javax.net.ssl.SSLContext;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.apache.http.NameValuePair;
+import org.apache.http.client.CredentialsProvider;
+import org.apache.http.client.utils.URIUtils;
+import org.apache.http.client.utils.URLEncodedUtils;
 
 /**
  * A proxy servlet in which the target URI is templated from incoming request parameters. The
@@ -127,8 +127,10 @@ public class URITemplateProxyServlet extends ProxyServlet {
     if (iPort > 0) {
         if (newTargetUri.startsWith("https")) {
             newTargetUri = newTargetUri.substring(0, iPort) + ":443" + newTargetUri.substring(iPort+3);  
+        } else if (newTargetUri.startsWith("https")){
+            newTargetUri = newTargetUri.substring(0, iPort) + ":80" + newTargetUri.substring(iPort+3);
         } else {
-            newTargetUri = newTargetUri.substring(0, iPort) + ":80" + newTargetUri.substring(iPort+3);  
+            newTargetUri = newTargetUri.substring(0, iPort) + newTargetUri.substring(iPort+3);
         }
     }
     servletRequest.setAttribute(ATTR_TARGET_URI, newTargetUri);
