@@ -276,7 +276,7 @@ public abstract class ProxyServlet extends HttpServlet {
       }
       // proxy hell
       {
-          clientBuilder.useSystemProperties();
+          // clientBuilder.useSystemProperties();
       }
       return clientBuilder.build();
       } catch (Exception e) {
@@ -358,6 +358,8 @@ public abstract class ProxyServlet extends HttpServlet {
     //////////////////canary
     if (onPremiseProxy != null) {
         proxyRequest.getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY, new HttpHost(onPremiseProxy.getKey(), onPremiseProxy.getValue()));
+    } else if (!proxyRequestUri.contains("sap.corp")){
+        proxyRequest.getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY, new HttpHost("proxy.wdf.sap.corp", 8080));
     }
     
     if (consumerAccount != null && !consumerAccount.trim().isEmpty()) {
