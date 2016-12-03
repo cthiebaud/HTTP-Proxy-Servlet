@@ -406,8 +406,18 @@ public abstract class ProxyServlet extends HttpServlet {
     copyRequestHeaders(servletRequest, proxyRequest);
     
     //////////////////canary
-    if (proxyType.equals("Internet")){
-        proxyRequest.getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY, new HttpHost(System.getProperty("http.proxyHost"), Integer.valueOf(System.getProperty("http.proxyPort"))));
+    if (proxyType.equals("Internet")) {
+    	String http_proxyHost = System.getProperty("http.proxyHost");
+    	String http_proxyPort = System.getProperty("http.proxyPort");
+    	if (http_proxyHost != null && !http_proxyHost.trim().isEmpty() && 
+    	    http_proxyPort != null && !http_proxyPort.trim().isEmpty()) {
+    		try {
+				Integer http_proxyPortAsInteger = Integer.valueOf(http_proxyPort);
+		        proxyRequest.getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY, new HttpHost(http_proxyHost, http_proxyPortAsInteger ));
+			} catch (NumberFormatException e) {
+				log("ignored NumberFormatException parsing System.getProperty(\"http.proxyPort\") = " + http_proxyPort + ". No proxy set.s");
+			}
+    	}
     } else if (onPremiseProxy != null) {
         proxyRequest.getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY, new HttpHost(onPremiseProxy.getKey(), onPremiseProxy.getValue()));
         // http://www.baeldung.com/httpclient-stop-follow-redirect
