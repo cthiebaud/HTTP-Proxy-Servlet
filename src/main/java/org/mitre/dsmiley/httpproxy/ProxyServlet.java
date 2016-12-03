@@ -530,7 +530,6 @@ public abstract class ProxyServlet extends HttpServlet {
   /** Copy request headers from the servlet client to the proxy request. */
   protected void copyRequestHeaders(HttpServletRequest servletRequest, HttpRequest proxyRequest) {
     // Get an Enumeration of all of the header names sent by the client
-    @SuppressWarnings("unchecked")
     Enumeration<String> enumerationOfHeaderNames = servletRequest.getHeaderNames();
     while (enumerationOfHeaderNames.hasMoreElements()) {
       String headerName = enumerationOfHeaderNames.nextElement();
@@ -550,7 +549,6 @@ public abstract class ProxyServlet extends HttpServlet {
     if (hopByHopHeaders.containsHeader(headerName))
       return;
 
-    @SuppressWarnings("unchecked")
     Enumeration<String> headers = servletRequest.getHeaders(headerName);
     while (headers.hasMoreElements()) {//sometimes more than one value
       String headerValue = headers.nextElement();
