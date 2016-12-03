@@ -126,17 +126,11 @@ public class URITemplateProxyServlet extends ProxyServlet {
         throw new ServletException("[zebulon] Missing HTTP parameter proxyType");
     }
     matcher.appendTail(urlBuf);
-    String newTargetUri = urlBuf.toString();
-    int iPort = newTargetUri.indexOf(":-1");
-    if (iPort > 0) {
-        if (newTargetUri.startsWith("https")) {
-            newTargetUri = newTargetUri.substring(0, iPort) + ":443" + newTargetUri.substring(iPort+3);  
-        } else if (newTargetUri.startsWith("https")){
-            newTargetUri = newTargetUri.substring(0, iPort) + ":80" + newTargetUri.substring(iPort+3);
-        } else {
-            newTargetUri = newTargetUri.substring(0, iPort) + newTargetUri.substring(iPort+3);
-        }
-    }
+    
+    // fix port
+    String newTargetUri = fixPort(urlBuf.toString(), proxyType);
+    
+    log("[zebulon] new TARGET URI is " + newTargetUri + " <<<<<<<<<<<<<<<<<<<<<<<<<");
     servletRequest.setAttribute(ATTR_TARGET_URI, newTargetUri);
     URI targetUriObj;
     try {
@@ -144,7 +138,6 @@ public class URITemplateProxyServlet extends ProxyServlet {
     } catch (Exception e) {
       throw new ServletException("Rewritten targetUri is invalid: " + newTargetUri,e);
     }
-    log("[zebulon] new TARGET URI is " + newTargetUri + " <<<<<<<<<<<<<<<<<<<<<<<<<");
     servletRequest.setAttribute(ATTR_TARGET_HOST, URIUtils.extractHost(targetUriObj));
 
     //Determine the new query string based on removing the used names
@@ -157,11 +150,31 @@ public class URITemplateProxyServlet extends ProxyServlet {
         newQueryBuf.append(nameVal.getValue());
     }
     String newQueryString = newQueryBuf.toString();
-    log("[zebulon] new QUERY STRING is " + newQueryString + " <<<<<<<<<<<<<<<<<<<<<<<<<");
     servletRequest.setAttribute(ATTR_QUERY_STRING, newQueryString);
 
     super.service(servletRequest, servletResponse);
   }
+
+	static private String fixPort(final String newTargetUri, final String proxyType) {
+		String tmpTargetUri = newTargetUri;
+		int minusOneIndex = tmpTargetUri.indexOf(":-1");
+		if (minusOneIndex > 0) {
+			if (proxyType.equals("Internet")) {
+				// never put default port
+				tmpTargetUri = newTargetUri.substring(0, minusOneIndex) + newTargetUri.substring(minusOneIndex + 3);
+			} else {
+				// never use explicit port
+				if (newTargetUri.startsWith("https")) {
+					tmpTargetUri = newTargetUri.substring(0, minusOneIndex) + ":443"
+							+ newTargetUri.substring(minusOneIndex + 3);
+				} else if (newTargetUri.startsWith("https")) {
+					tmpTargetUri = newTargetUri.substring(0, minusOneIndex) + ":80"
+							+ newTargetUri.substring(minusOneIndex + 3);
+				}
+			}
+		}
+		return tmpTargetUri;
+	}
 
   @Override
   protected String rewriteQueryStringFromRequest(HttpServletRequest servletRequest, String queryString) {
