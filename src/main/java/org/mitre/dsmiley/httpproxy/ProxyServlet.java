@@ -406,7 +406,7 @@ public abstract class ProxyServlet extends HttpServlet {
     copyRequestHeaders(servletRequest, proxyRequest);
     
     //////////////////canary
-    if (proxyType.equals("internet")){
+    if (proxyType.equals("Internet")){
         proxyRequest.getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY, new HttpHost(System.getProperty("http.proxyHost"), Integer.valueOf(System.getProperty("http.proxyPort"))));
     } else if (onPremiseProxy != null) {
         proxyRequest.getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY, new HttpHost(onPremiseProxy.getKey(), onPremiseProxy.getValue()));
