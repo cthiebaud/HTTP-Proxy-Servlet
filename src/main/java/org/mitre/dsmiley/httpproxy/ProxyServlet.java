@@ -48,7 +48,6 @@ import org.apache.http.HttpResponse;
 import org.apache.http.client.CredentialsProvider;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.AbortableHttpRequest;
-import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.params.ClientPNames;
 import org.apache.http.client.params.CookiePolicy;
 import org.apache.http.client.utils.URIUtils;
@@ -368,6 +367,8 @@ public abstract class ProxyServlet extends HttpServlet {
         proxyRequest.getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY, new HttpHost(System.getProperty("http.proxyHost"), Integer.valueOf(System.getProperty("http.proxyPort"))));
     } else if (onPremiseProxy != null) {
         proxyRequest.getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY, new HttpHost(onPremiseProxy.getKey(), onPremiseProxy.getValue()));
+        // http://www.baeldung.com/httpclient-stop-follow-redirect
+        proxyRequest.getParams().setParameter(ClientPNames.HANDLE_REDIRECTS, false);
     }
     
     if (consumerAccount != null && !consumerAccount.trim().isEmpty()) {
