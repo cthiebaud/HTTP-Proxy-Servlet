@@ -123,7 +123,7 @@ public class URITemplateProxyServlet extends ProxyServlet {
       }
     }
     if (this.proxyType == null) {
-        throw new ServletException("Missing HTTP parameter proxyType");
+        throw new ServletException("[zebulon] Missing HTTP parameter proxyType");
     }
     matcher.appendTail(urlBuf);
     String newTargetUri = urlBuf.toString();
@@ -144,6 +144,7 @@ public class URITemplateProxyServlet extends ProxyServlet {
     } catch (Exception e) {
       throw new ServletException("Rewritten targetUri is invalid: " + newTargetUri,e);
     }
+    log("[zebulon] new TARGET URI is " + newTargetUri + " <<<<<<<<<<<<<<<<<<<<<<<<<");
     servletRequest.setAttribute(ATTR_TARGET_HOST, URIUtils.extractHost(targetUriObj));
 
     //Determine the new query string based on removing the used names
@@ -155,7 +156,9 @@ public class URITemplateProxyServlet extends ProxyServlet {
       if (nameVal.getValue() != null)
         newQueryBuf.append(nameVal.getValue());
     }
-    servletRequest.setAttribute(ATTR_QUERY_STRING, newQueryBuf.toString());
+    String newQueryString = newQueryBuf.toString();
+    log("[zebulon] new QUERY STRING is " + newQueryString + " <<<<<<<<<<<<<<<<<<<<<<<<<");
+    servletRequest.setAttribute(ATTR_QUERY_STRING, newQueryString);
 
     super.service(servletRequest, servletResponse);
   }

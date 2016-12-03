@@ -177,6 +177,7 @@ public abstract class ProxyServlet extends HttpServlet {
        }
     }
     this.consumerAccount = System.getenv("HC_ACCOUNT");
+    log("[zebulon] onPremiseProxy = " + onPremiseProxy + ", consumerAccount = " + consumerAccount );
     ////////////////// canary
       
     String doLogStr = getConfigParam(P_LOG);
@@ -413,19 +414,25 @@ public abstract class ProxyServlet extends HttpServlet {
     	    http_proxyPort != null && !http_proxyPort.trim().isEmpty()) {
     		try {
 				Integer http_proxyPortAsInteger = Integer.valueOf(http_proxyPort);
-		        proxyRequest.getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY, new HttpHost(http_proxyHost, http_proxyPortAsInteger ));
+				HttpHost pprrooxxyy = new HttpHost(http_proxyHost, http_proxyPortAsInteger );
+		        proxyRequest.getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY, pprrooxxyy);
+				log("[zebulon] via proxy: " + pprrooxxyy);
 			} catch (NumberFormatException e) {
 				log("ignored NumberFormatException parsing System.getProperty(\"http.proxyPort\") = " + http_proxyPort + ". No proxy set.s");
 			}
     	}
     } else if (onPremiseProxy != null) {
-        proxyRequest.getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY, new HttpHost(onPremiseProxy.getKey(), onPremiseProxy.getValue()));
+    	HttpHost pprrooxxyy = new HttpHost(onPremiseProxy.getKey(), onPremiseProxy.getValue());
+        proxyRequest.getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY, pprrooxxyy);
+		log("[zebulon] via proxy: " + pprrooxxyy);
         // http://www.baeldung.com/httpclient-stop-follow-redirect
         proxyRequest.getParams().setParameter(ClientPNames.HANDLE_REDIRECTS, false);
+		log("[zebulon] do not follow redirects");
     }
     
     if (consumerAccount != null && !consumerAccount.trim().isEmpty()) {
         proxyRequest.setHeader( "SAP-Connectivity-ConsumerAccount", consumerAccount);
+		log("[zebulon] setHeader 'SAP-Connectivity-ConsumerAccount' to " + consumerAccount);
 
         // look up the connectivity authentication header provider resource called "authHeaderProvider" (must be defined in web.xml)
         Context ctx;
@@ -435,16 +442,15 @@ public abstract class ProxyServlet extends HttpServlet {
             // get header for principal propagation
             AuthenticationHeader principalPropagationHeader = authHeaderProvider.getPrincipalPropagationHeader();
             //insert the necessary headers in the request
-            System.out.println("principalPropagationHeader.getName() = "+principalPropagationHeader.getName());
-            System.out.println("principalPropagationHeader.getValue() = "+principalPropagationHeader.getValue());
             proxyRequest.addHeader(principalPropagationHeader.getName(), principalPropagationHeader.getValue());
+            log("[zebulon] principalPropagationHeader.name: "+principalPropagationHeader.getName());
+            log("[zebulon] principalPropagationHeader.value: "+principalPropagationHeader.getValue());
         } catch (NamingException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
-
     }
-    //////////////////canary
+    ////////////////// canary
 
     setXForwardedForHeader(servletRequest, proxyRequest);
 
