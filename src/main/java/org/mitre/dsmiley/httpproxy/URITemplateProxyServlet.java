@@ -58,7 +58,7 @@ public class URITemplateProxyServlet extends ProxyServlet {
   * But that's not how the spec works. So for now we will require a proxy arg to be present
   * if defined for this proxy URL.
   */
-  protected static final Pattern TEMPLATE_PATTERN = Pattern.compile("\\{([a-zA-Z0-9_%.]+)\\}");
+  protected static final Pattern TEMPLATE_PATTERN = Pattern.compile("\\{(.+?)\\}");
   private static final String ATTR_QUERY_STRING =
           URITemplateProxyServlet.class.getSimpleName() + ".queryString";
 
@@ -86,7 +86,11 @@ public class URITemplateProxyServlet extends ProxyServlet {
      * we can keep the proxy parameters in the query string and not
      * have to add them to a URL encoded form attachment.
      */
-    String queryString = "?" + servletRequest.getQueryString();//no "?" but might have "#"
+    String requestQueryString = servletRequest.getQueryString();
+    String queryString = "";
+    if (requestQueryString != null) {
+      queryString = "?" + requestQueryString;//no "?" but might have "#"
+    }
     int hash = queryString.indexOf('#');
     if (hash >= 0) {
       queryString = queryString.substring(0, hash);
