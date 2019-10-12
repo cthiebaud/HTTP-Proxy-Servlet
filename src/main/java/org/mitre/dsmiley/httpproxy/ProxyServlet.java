@@ -295,6 +295,8 @@ public abstract class ProxyServlet extends HttpServlet {
       // Properties:
       Class clientClazz = Class.forName("org.apache.http.impl.client.SystemDefaultHttpClient");
       Constructor constructor = clientClazz.getConstructor(HttpParams.class);
+      Class<?> clientClazz = Class.forName("org.apache.http.impl.client.SystemDefaultHttpClient");
+      Constructor<?> constructor = clientClazz.getConstructor(HttpParams.class);
       return (HttpClient) constructor.newInstance(hcParams);
     } catch (ClassNotFoundException e) {
       //no problem; use v4.1 below
